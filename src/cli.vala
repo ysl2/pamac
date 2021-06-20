@@ -28,6 +28,18 @@ namespace Pamac {
 		GenericSet<string?> already_checked_aur_dep;
 		public Subprocess pkttyagent;
 
+		// color definitions
+		string escape = "\033[0m";
+		string color_installed = "\033[38;5;10m";
+		string color_version = "\033[38;5;30m";
+		string color_pkgname = "\033[38;5;5m";
+		string color_repo_core = "\033[38;5;81m";
+		string color_repo_extra = "\033[38;5;75m";
+		string color_repo_community = "\033[38;5;68m";
+		string color_repo_multilib = "\033[38;5;62m";
+		string color_repo_kdeunstable = "\033[38;5;61m";
+		string color_repo_other = "\033[38;5;55m";
+
 		public Cli () {
 			exit_status = 0;
 			trans_cancellable = false;
@@ -101,8 +113,9 @@ namespace Pamac {
 					bool no_aur = false;
 					bool files = false;
 					bool quiet = false;
+					bool color = false;
 					try {
-						var options = new OptionEntry[7];
+						var options = new OptionEntry[8];
 						options[0] = { "help", 'h', 0, OptionArg.NONE, ref help, null, null };
 						options[1] = { "installed", 'i', 0, OptionArg.NONE, ref installed, null, null };
 						options[2] = { "repos", 'r', 0, OptionArg.NONE, ref repos, null, null };
@@ -110,6 +123,7 @@ namespace Pamac {
 						options[4] = { "no-aur", 0, 0, OptionArg.NONE, ref no_aur, null, null };
 						options[5] = { "files", 'f', 0, OptionArg.NONE, ref files, null, null };
 						options[6] = { "quiet", 'q', 0, OptionArg.NONE, ref quiet, null, null };
+						options[7] = { "color", 'c', 0, OptionArg.NONE, ref color, null, null };
 						var opt_context = new OptionContext (null);
 						opt_context.set_help_enabled (false);
 						opt_context.add_main_entries (options, null);
@@ -148,7 +162,7 @@ namespace Pamac {
 							return;
 						} else {
 							search_string = concatenate_strings (args[2:args.length]);
-							search_installed_pkgs (quiet);
+							search_installed_pkgs (quiet, color);
 						}
 					} else if (repos) {
 						if (installed) {
@@ -156,11 +170,11 @@ namespace Pamac {
 							return;
 						} else {
 							search_string = concatenate_strings (args[2:args.length]);
-							search_repos_pkgs (quiet);
+							search_repos_pkgs (quiet, color);
 						}
 					} else {
 						search_string = concatenate_strings (args[2:args.length]);
-						search_pkgs (quiet);
+						search_pkgs (quiet, color);
 					}
 				} else {
 					display_search_help ();
@@ -1103,7 +1117,8 @@ namespace Pamac {
 								"  --aur, -a",
 								"  --no-aur",
 								"  --files, -f",
-								"  --quiet, -q"};
+								"  --quiet, -q",
+								"  --color, -c"};
 			foreach (unowned string option in options) {
 				int length = option.char_count ();
 				if (length > max_length) {
@@ -1115,7 +1130,8 @@ namespace Pamac {
 								dgettext (null, "also search in AUR"),
 								dgettext (null, "do not search in AUR"),
 								dgettext (null, "search for packages which own the given filenames (filenames can be partial)"),
-								dgettext (null, "only print names")};
+								dgettext (null, "only print names"),
+								dgettext (null, "colorize output")};
 			int i = 0;
 			foreach (unowned string option in options) {
 				print_property (option, details[i], max_length);
@@ -1459,7 +1475,7 @@ namespace Pamac {
 			}
 		}
 
-		void search_pkgs (bool quiet) {
+		void search_pkgs (bool quiet, bool color) {
 			var pkgs = database.search_pkgs (search_string);
 			if (database.config.enable_aur) {
 				var aur_pkgs = database.search_aur_pkgs (search_string);
@@ -1470,22 +1486,22 @@ namespace Pamac {
 				}
 			}
 			pkgs.sort (sort_search_pkgs_by_relevance);
-			print_search_pkgs (pkgs, true, quiet);
+			print_search_pkgs (pkgs, true, quiet, color);
 		}
 
-		void search_installed_pkgs (bool quiet) {
+		void search_installed_pkgs (bool quiet, bool color) {
 			var pkgs = database.search_installed_pkgs (search_string);
 			pkgs.sort (sort_search_pkgs_by_relevance);
-			print_search_pkgs (pkgs, false, quiet);
+			print_search_pkgs (pkgs, false, quiet, color);
 		}
 
-		void search_repos_pkgs (bool quiet) {
+		void search_repos_pkgs (bool quiet, bool color) {
 			var pkgs = database.search_repos_pkgs (search_string);
 			pkgs.sort (sort_search_pkgs_by_relevance);
-			print_search_pkgs (pkgs, true, quiet);
+			print_search_pkgs (pkgs, true, quiet, color);
 		}
 
-		void print_search_pkgs (GenericArray<unowned AlpmPackage> pkgs, bool print_installed, bool quiet) {
+		void print_search_pkgs (GenericArray<unowned AlpmPackage> pkgs, bool print_installed, bool quiet, bool color) {
 			if (quiet) {
 				// print in reverse order
 				uint length = pkgs.length;
@@ -1514,14 +1530,23 @@ namespace Pamac {
 			int installed_available_width = 0;
 			string installed = null;
 			if (print_installed) {
-				installed = "[%s]".printf (dgettext (null, "Installed"));
-				installed_available_width = available_width - (installed.char_count () + 1);
+				if (color) {
+					installed = color_installed + "[%s]".printf (dgettext (null, "Installed")) + escape;
+					installed_available_width = available_width - (installed.char_count () - 13);
+				} else {
+					installed = "[%s]".printf (dgettext (null, "Installed"));
+					installed_available_width = available_width - (installed.char_count () + 1);
+				}
 			}
 			// print in reverse order
 			int length = pkgs.length;
 			for (int i = length - 1; i >= 0; i--) {
 				unowned AlpmPackage pkg = pkgs[i];
 				var str_builder = new StringBuilder (pkg.name);
+				if (color) {
+					str_builder.prepend (color_pkgname);
+					str_builder.append (escape);
+				}
 				str_builder.append (" ");
 				int diff = 0;
 				if (print_installed && pkg.installed_version != null) {
@@ -1540,7 +1565,24 @@ namespace Pamac {
 					str_builder.append (" ");
 				}
 				string repo = pkg.repo ?? "";
-				str_builder.append ("%-*s  %s \n".printf (version_length, pkg.version, repo));
+				if (color) {
+					if (repo == "core") {
+						repo = color_repo_core + repo + escape;
+					} else if (repo == "extra") {
+						repo = color_repo_extra + repo + escape;
+					} else if (repo == "community") {
+						repo = color_repo_community + repo + escape;
+					} else if (repo == "multilib") {
+						repo = color_repo_multilib + repo + escape;
+					} else if (repo == "kde-unstable") {
+						repo = color_repo_kdeunstable + repo + escape;
+					} else {
+						repo = color_repo_other + repo + escape;
+					}
+					str_builder.append ("%s%-*s%s  %s \n".printf (color_version, version_length, pkg.version, escape, repo));
+				} else {
+					str_builder.append ("%-*s  %s \n".printf (version_length, pkg.version, repo));
+				}
 				stdout.printf (str_builder.str);
 				GenericArray<string> cuts = split_string (pkg.desc, 4, available_width);
 				foreach (unowned string cut in cuts) {
