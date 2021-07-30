@@ -1,3 +1,9 @@
+# Pamac
+
+> NOTE: This version is patched for colorizing output.
+>
+> Reference: https://forum.manjaro.org/t/colorizing-pamac-on-the-cli/70219/7
+
 Pamac is a Gtk and CLI front ends of libpamac
 
 #### Features
@@ -10,13 +16,22 @@ Pamac is a Gtk and CLI front ends of libpamac
 
 #### Installing from source
 
-Pamac uses [Meson](http://mesonbuild.com/index.html) build system.
+1. Dependencies
+
+    ```text
+    meson
+    vala
+    asciidoc
+    ```
+
+2. Pamac uses [Meson](http://mesonbuild.com/index.html) build system.
 In the source directory run:
 
-`mkdir builddir && cd builddir`
+    `mkdir builddir && cd builddir`
 
-`meson setup --prefix=/usr --sysconfdir=/etc --buildtype=release`
+    `meson setup --prefix=/usr --sysconfdir=/etc --buildtype=release`
 
-`meson compile`
+    `meson compile`
 
-`sudo meson install`
+    `sudo meson install`
+
